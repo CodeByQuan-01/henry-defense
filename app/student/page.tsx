@@ -487,7 +487,6 @@ export default function StudentPage() {
                       size={200}
                       level="H"
                       includeMargin={true}
-                      renderAs="canvas"
                       bgColor="#FFFFFF"
                       fgColor="#1e293b"
                     />
