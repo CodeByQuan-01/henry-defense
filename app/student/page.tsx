@@ -106,7 +106,7 @@ const IDCard = ({
   studentId: string;
   formData: any;
   photoPreview: string;
-  idCardRef: React.RefObject<HTMLDivElement>;
+  idCardRef: React.RefObject<HTMLDivElement | null>;
 }) => {
   const facultyName =
     faculties.find((f) => f.id === formData.faculty)?.name || "";
