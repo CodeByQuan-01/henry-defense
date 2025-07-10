@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -16,7 +16,14 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2, Shield, Lock, Mail, ScanLine } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  Shield,
+  Lock,
+  Mail,
+  ScanLine,
+} from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 
 export default function AdminLoginPage() {
@@ -27,9 +34,15 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // If user is already logged in, redirect to dashboard
+  // Redirect to dashboard if already logged in
+  useEffect(() => {
+    if (user) {
+      router.push("/admin/dashboard");
+    }
+  }, [user, router]);
+
+  // Avoid rendering login form if user is already logged in
   if (user) {
-    router.push("/admin/dashboard");
     return null;
   }
 
@@ -95,7 +108,6 @@ export default function AdminLoginPage() {
       {/* Main Content */}
       <main className="container mx-auto py-12 px-6">
         <div className="max-w-md mx-auto">
-          {/* Admin Login Card */}
           <Card className="border-0 shadow-2xl bg-white overflow-hidden">
             <CardHeader className="bg-emerald-50 text-center pb-6 pt-8">
               <div className="mx-auto bg-emerald-100 p-6 rounded-2xl mb-4">
@@ -188,7 +200,6 @@ export default function AdminLoginPage() {
             </CardFooter>
           </Card>
 
-          {/* Security Notice */}
           <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <div className="p-1 bg-blue-100 rounded-full">
@@ -209,7 +220,6 @@ export default function AdminLoginPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="bg-slate-800 text-white mt-12">
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
