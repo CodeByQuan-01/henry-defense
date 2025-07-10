@@ -38,7 +38,7 @@ import {
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { QrScanner } from "@/components/qr-scanner";
+import { SimpleQrScanner } from "@/components/simple-qr-scanner";
 import { StudentDetails } from "@/components/student-detail";
 import {
   DropdownMenu,
@@ -156,33 +156,71 @@ export default function AdminDashboardPage() {
 
   // Handle QR code scan
   const handleScan = async (studentId: string) => {
-    if (!studentId || studentId.trim() === "") return;
+    if (!studentId || studentId.trim() === "") {
+      toast.error("Invalid QR Code", {
+        description: "QR code appears to be empty",
+      });
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log("Scanned QR code:", studentId);
 
-      // Check if the scanned value is a valid Firebase document ID
-      // Firebase IDs are typically 20 characters
-      if (!/^[a-zA-Z0-9]{20}$/.test(studentId)) {
-        // Try to parse as JSON in case it's a JSON string
+      let processedId = studentId.trim();
+
+      // Try different ways to extract the student ID
+      // 1. Check if it's already a valid Firebase document ID (20 characters)
+      if (/^[a-zA-Z0-9]{20}$/.test(processedId)) {
+        // Already a valid ID, use as is
+      }
+      // 2. Try to parse as JSON
+      else if (processedId.startsWith("{") || processedId.startsWith("[")) {
         try {
-          const parsedData = JSON.parse(studentId);
+          const parsedData = JSON.parse(processedId);
           if (parsedData && parsedData.id) {
-            studentId = parsedData.id;
+            processedId = parsedData.id;
+          } else if (parsedData && parsedData.studentId) {
+            processedId = parsedData.studentId;
           }
         } catch (e) {
-          // Not JSON, continue with the original value
+          console.log("Not valid JSON:", e);
+        }
+      }
+      // 3. Check if it's a URL with the ID as a parameter
+      else if (processedId.includes("student") || processedId.includes("id=")) {
+        const urlMatch = processedId.match(/id=([a-zA-Z0-9]{20})/);
+        if (urlMatch) {
+          processedId = urlMatch[1];
+        }
+      }
+      // 4. If it looks like it might contain an ID, try to extract it
+      else {
+        const idMatch = processedId.match(/[a-zA-Z0-9]{20}/);
+        if (idMatch) {
+          processedId = idMatch[0];
         }
       }
 
-      const studentDoc = doc(db, "students", studentId);
+      console.log("Processing student ID:", processedId);
+
+      // Validate the processed ID
+      if (!/^[a-zA-Z0-9]{20}$/.test(processedId)) {
+        toast.error("Invalid QR Code Format", {
+          description: "This doesn't appear to be a valid student QR code",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Try to find the student document
       const studentSnapshot = await getDocs(
-        query(collection(db, "students"), where("__name__", "==", studentId))
+        query(collection(db, "students"), where("__name__", "==", processedId))
       );
 
       if (studentSnapshot.empty) {
-        toast.error("Invalid QR Code", {
-          description: "No student found with this QR code",
+        toast.error("Student Not Found", {
+          description: "No student record found for this QR code",
         });
         setLoading(false);
         return;
@@ -194,24 +232,30 @@ export default function AdminDashboardPage() {
         ...studentData,
       };
 
-      setScannedStudentId(studentId);
+      setScannedStudentId(processedId);
       setScannedStudent(student);
 
       // Log the scan
-      await addDoc(collection(db, "scanLogs"), {
-        studentId,
-        adminId: user?.uid,
-        adminEmail: user?.email,
-        timestamp: serverTimestamp(),
-      });
+      try {
+        await addDoc(collection(db, "scanLogs"), {
+          studentId: processedId,
+          adminId: user?.uid || "unknown",
+          adminEmail: user?.email || "unknown",
+          timestamp: serverTimestamp(),
+          rawQrData: studentId, // Store the original QR data for debugging
+        });
+      } catch (logError) {
+        console.error("Error logging scan:", logError);
+        // Don't fail the whole operation if logging fails
+      }
 
-      toast.success("QR Code Scanned", {
+      toast.success("QR Code Scanned Successfully!", {
         description: `Found student: ${student.fullName}`,
       });
     } catch (error) {
       console.error("Error scanning QR code:", error);
-      toast.error("Error", {
-        description: "Failed to process QR code",
+      toast.error("Scan Error", {
+        description: "Failed to process QR code. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -353,7 +397,7 @@ export default function AdminDashboardPage() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <QrScanner onScan={handleScan} />
+                    <SimpleQrScanner onScan={handleScan} />
                     <ManualEntry onSubmit={handleScan} />
                   </div>
                   <div>
@@ -402,7 +446,10 @@ export default function AdminDashboardPage() {
                   <div className="flex gap-2 w-full md:w-auto">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          className="flex gap-2 bg-transparent"
+                        >
                           <Filter className="h-4 w-4" />
                           {statusFilter === "all" ? "All Status" : statusFilter}
                         </Button>
@@ -433,7 +480,7 @@ export default function AdminDashboardPage() {
 
                     <Button
                       variant="outline"
-                      className="flex gap-2"
+                      className="flex gap-2 bg-transparent"
                       onClick={exportToCSV}
                     >
                       <Download className="h-4 w-4" />
@@ -508,7 +555,7 @@ export default function AdminDashboardPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 px-2 text-xs"
+                                  className="h-8 px-2 text-xs bg-transparent"
                                   onClick={() => {
                                     setScannedStudentId(student.id);
                                     setScannedStudent(student);
@@ -522,7 +569,7 @@ export default function AdminDashboardPage() {
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-8 px-2 text-xs"
+                                      className="h-8 px-2 text-xs bg-transparent"
                                     >
                                       Status
                                     </Button>

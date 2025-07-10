@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-
+import { useRef } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import {
 } from "firebase/firestore";
 import { QRCodeCanvas } from "qrcode.react";
 import { toast } from "sonner";
+import * as htmlToImage from "html-to-image";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -96,8 +97,114 @@ const faculties = [
   },
 ];
 
+const IDCard = ({
+  studentId,
+  formData,
+  photoPreview,
+  idCardRef,
+}: {
+  studentId: string;
+  formData: any;
+  photoPreview: string;
+  idCardRef: React.RefObject<HTMLDivElement>;
+}) => {
+  const facultyName =
+    faculties.find((f) => f.id === formData.faculty)?.name || "";
+
+  return (
+    <div
+      ref={idCardRef}
+      className="w-full max-w-md mx-auto bg-white rounded-2xl overflow-hidden shadow-xl border-4 border-slate-100"
+    >
+      {/* ID Card Header */}
+      <div className="bg-blue-600 py-3 px-6 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <Shield className="h-6 w-6 text-white" />
+          <h2 className="text-white font-bold text-lg">University ID Card</h2>
+        </div>
+        <span className="text-white text-sm font-medium">
+          Valid until: 12/2025
+        </span>
+      </div>
+
+      {/* ID Card Content */}
+      <div className="p-6">
+        <div className="flex gap-6">
+          {/* Photo and QR Code */}
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-slate-200">
+              <img
+                src={photoPreview || "/placeholder.svg"}
+                alt="Student"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="bg-white p-2 rounded-lg border border-slate-200">
+              <QRCodeCanvas
+                value={studentId}
+                size={100}
+                level="H"
+                includeMargin={false}
+                bgColor="#FFFFFF"
+                fgColor="#1e293b"
+              />
+            </div>
+          </div>
+
+          {/* Student Details */}
+          <div className="flex-1">
+            <div className="mb-4">
+              <h3 className="text-xl font-bold text-slate-800">
+                {formData.fullName}
+              </h3>
+              <p className="text-slate-600 text-sm">{facultyName}</p>
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs text-slate-500 font-medium">
+                  Matric Number
+                </p>
+                <p className="text-slate-800 font-bold">
+                  {formData.matricNumber}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 font-medium">Department</p>
+                <p className="text-slate-800 font-medium">
+                  {formData.department}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 font-medium">Status</p>
+                <p className="text-green-600 font-medium">Active</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 pt-4 border-t border-slate-200">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-blue-600" />
+              <span className="text-xs text-slate-600">Student ID</span>
+            </div>
+            <div className="text-xs text-slate-500">
+              Scan QR to verify authenticity
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function StudentPage() {
   const router = useRouter();
+  const idCardRef = useRef<HTMLDivElement>(null);
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -208,7 +315,7 @@ export default function StudentPage() {
       setStep(2);
 
       toast.success("Success!", {
-        description: "Your QR code has been generated successfully",
+        description: "Your ID card has been generated successfully",
       });
     } catch (error) {
       console.error("Error:", error);
@@ -233,6 +340,33 @@ export default function StudentPage() {
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
+    }
+  };
+
+  const downloadIDCard = async () => {
+    if (!idCardRef.current) return;
+
+    try {
+      // Increase the scale for better quality
+      const dataUrl = await htmlToImage.toPng(idCardRef.current, {
+        quality: 1,
+        pixelRatio: 3, // Higher resolution
+        backgroundColor: "white",
+      });
+
+      const link = document.createElement("a");
+      link.download = `${formData.matricNumber}_id_card.png`;
+      link.href = dataUrl;
+      link.click();
+
+      toast.success("ID Card Downloaded", {
+        description: "Your ID card has been downloaded successfully",
+      });
+    } catch (error) {
+      console.error("Error downloading ID card:", error);
+      toast.error("Download Failed", {
+        description: "There was an error downloading your ID card",
+      });
     }
   };
 
@@ -458,7 +592,7 @@ export default function StudentPage() {
                     ) : (
                       <>
                         <QrCode className="mr-3 h-5 w-5" />
-                        Generate QR Code
+                        Generate ID Card
                       </>
                     )}
                   </Button>
@@ -472,25 +606,20 @@ export default function StudentPage() {
                   <QrCode className="h-8 w-8 text-white" />
                 </div>
                 <CardTitle className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
-                  Your Digital ID
+                  Your Digital ID Card
                 </CardTitle>
                 <CardDescription className="text-base text-slate-600">
-                  Keep this QR code safe for verification
+                  Keep this ID card safe for verification
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-8">
                 <div className="flex flex-col items-center space-y-8">
-                  <div className="bg-white p-8 rounded-3xl shadow-lg border-4 border-slate-100">
-                    <QRCodeCanvas
-                      id="qr-code"
-                      value={studentId}
-                      size={200}
-                      level="H"
-                      includeMargin={true}
-                      bgColor="#FFFFFF"
-                      fgColor="#1e293b"
-                    />
-                  </div>
+                  <IDCard
+                    studentId={studentId}
+                    formData={formData}
+                    photoPreview={formData.photoPreview}
+                    idCardRef={idCardRef}
+                  />
 
                   <div className="bg-slate-50 p-6 rounded-2xl w-full border border-slate-200">
                     <div className="flex items-center gap-3 mb-6">
@@ -541,11 +670,11 @@ export default function StudentPage() {
               </CardContent>
               <CardFooter className="flex flex-col gap-4 p-8">
                 <Button
-                  onClick={downloadQRCode}
+                  onClick={downloadIDCard}
                   className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 text-base"
                 >
                   <Download className="mr-3 h-5 w-5" />
-                  Download QR Code
+                  Download ID Card
                 </Button>
                 <Button
                   variant="outline"
