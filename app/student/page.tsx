@@ -1,16 +1,16 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, ArrowLeft, Upload } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, Download } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
@@ -91,6 +91,7 @@ const levels = ["100", "200", "300", "400", "500"];
 
 export default function StudentPage() {
   const router = useRouter();
+  const qrCodeRef = useRef<HTMLDivElement>(null);
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -174,12 +175,6 @@ export default function StudentPage() {
         return;
       }
 
-      // Log Cloudinary config
-      console.log(
-        "Cloudinary Cloud Name:",
-        process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-      );
-
       // Upload image to Cloudinary
       const cloudinaryData = new FormData();
       cloudinaryData.append("file", formData.photo);
@@ -194,8 +189,6 @@ export default function StudentPage() {
       );
 
       const cloudinaryResult = await cloudinaryResponse.json();
-      console.log("Cloudinary Response Status:", cloudinaryResponse.status);
-      console.log("Cloudinary Result:", cloudinaryResult);
 
       if (!cloudinaryResponse.ok) {
         throw new Error(
@@ -226,7 +219,7 @@ export default function StudentPage() {
       setStep(2);
 
       toast.success("Success!", {
-        description: "Your QR code has been generated successfully",
+        description: "Your ID card has been generated successfully",
       });
     } catch (error: any) {
       console.error("Error:", error);
@@ -240,18 +233,108 @@ export default function StudentPage() {
     }
   };
 
-  const downloadQRCode = () => {
-    const canvas = document.getElementById("qr-code") as HTMLCanvasElement;
-    if (canvas) {
-      const pngUrl = canvas
-        .toDataURL("image/png")
-        .replace("image/png", "image/octet-stream");
-      const downloadLink = document.createElement("a");
-      downloadLink.href = pngUrl;
-      downloadLink.download = `${formData.matricNumber}_qrcode.png`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
+  const downloadIDCard = () => {
+    // Create a canvas element for the ID card
+    const canvas = document.createElement("canvas");
+    canvas.width = 600;
+    canvas.height = 800;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Fill with white background
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw university header
+    ctx.fillStyle = "#213B94";
+    ctx.fillRect(0, 0, canvas.width, 80);
+    ctx.fillStyle = "white";
+    ctx.font = "bold 24px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("UNIVERSITY NAME", canvas.width / 2, 40);
+    ctx.font = "12px Arial";
+    ctx.fillText("OFFICIAL STUDENT ID CARD", canvas.width / 2, 60);
+
+    // Draw student photo if available
+    if (formData.photoPreview) {
+      const img = new Image();
+      img.src = formData.photoPreview;
+      img.onload = () => {
+        // Draw photo with border
+        ctx.strokeStyle = "#213B94";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(30, 100, 150, 150);
+        ctx.drawImage(img, 30, 100, 150, 150);
+
+        // Draw student information
+        ctx.fillStyle = "black";
+        ctx.font = "14px Arial";
+        ctx.textAlign = "left";
+
+        // Full Name
+        ctx.fillText("Full Name:", 200, 120);
+        ctx.font = "bold 16px Arial";
+        ctx.fillText(formData.fullName, 200, 140);
+
+        // Matric Number
+        ctx.font = "14px Arial";
+        ctx.fillText("Matric Number:", 200, 170);
+        ctx.font = "bold 16px Arial";
+        ctx.fillText(formData.matricNumber, 200, 190);
+
+        // Faculty/Department
+        ctx.font = "14px Arial";
+        ctx.fillText("Faculty/Department:", 200, 220);
+        ctx.font = "bold 16px Arial";
+        ctx.fillText(
+          `${faculties.find((f) => f.id === formData.faculty)?.name || ""} - ${
+            formData.department
+          }`,
+          200,
+          240
+        );
+
+        // Level
+        ctx.font = "14px Arial";
+        ctx.fillText("Level:", 200, 270);
+        ctx.font = "bold 16px Arial";
+        ctx.fillText(formData.level, 200, 290);
+
+        // Draw QR Code
+        const qrCanvas = document.querySelector("canvas");
+        if (qrCanvas) {
+          ctx.fillStyle = "white";
+          ctx.fillRect(canvas.width / 2 - 100, 350, 200, 200);
+          ctx.drawImage(qrCanvas, canvas.width / 2 - 75, 375, 150, 150);
+        }
+
+        // Add footer text
+        ctx.fillStyle = "black";
+        ctx.font = "12px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          "This card is property of University Name",
+          canvas.width / 2,
+          580
+        );
+        ctx.fillText(
+          `Valid until: ${new Date().getFullYear() + 1}`,
+          canvas.width / 2,
+          600
+        );
+
+        // Add border to entire card
+        ctx.strokeStyle = "#213B94";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+        // Convert canvas to image and download
+        const dataUrl = canvas.toDataURL("image/png");
+        const link = document.createElement("a");
+        link.download = `${formData.matricNumber}_id_card.png`;
+        link.href = dataUrl;
+        link.click();
+      };
     }
   };
 
@@ -281,7 +364,7 @@ export default function StudentPage() {
                   Student Registration
                 </CardTitle>
                 <CardDescription>
-                  Enter your details to generate a QR code
+                  Enter your details to generate your ID card
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -405,7 +488,7 @@ export default function StudentPage() {
                       {formData.photoPreview && (
                         <div className="relative h-32 w-full overflow-hidden rounded-lg border border-gray-200">
                           <img
-                            src={formData.photoPreview || "/placeholder.svg"}
+                            src={formData.photoPreview}
                             alt="Preview"
                             className="h-full w-full object-cover"
                           />
@@ -425,7 +508,7 @@ export default function StudentPage() {
                         Processing...
                       </>
                     ) : (
-                      "Generate QR Code"
+                      "Generate ID Card"
                     )}
                   </Button>
                 </form>
@@ -434,42 +517,95 @@ export default function StudentPage() {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="text-[#1B1F3B]">Your QR Code</CardTitle>
+                <CardTitle className="text-[#1B1F3B]">Your ID Card</CardTitle>
                 <CardDescription>
-                  Keep this QR code for verification
+                  Keep this ID card for verification purposes
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center">
-                <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
-                  <QRCodeCanvas
-                    id="qr-code"
-                    value={studentId}
-                    size={200}
-                    level="H"
-                    includeMargin={true}
-                    bgColor="#FFFFFF"
-                    fgColor="#000000"
-                  />
-                </div>
-                <div className="text-center mb-4">
-                  <p className="font-medium text-[#1B1F3B]">
-                    {formData.fullName}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {formData.matricNumber}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {faculties.find((f) => f.id === formData.faculty)?.name} -{" "}
-                    {formData.department} - Level {formData.level}
-                  </p>
+                <div
+                  className="w-full max-w-sm bg-white rounded-lg shadow-lg overflow-hidden border-4 border-[#213B94]"
+                  ref={qrCodeRef}
+                >
+                  <div className="bg-[#213B94] py-3 px-4 text-white text-center">
+                    <h2 className="text-xl font-bold">UNIVERSITY NAME</h2>
+                    <p className="text-xs">OFFICIAL STUDENT ID CARD</p>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-24 h-24 border-2 border-[#213B94] rounded-md overflow-hidden">
+                        {formData.photoPreview && (
+                          <img
+                            src={formData.photoPreview}
+                            alt="Student Photo"
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+
+                      <div className="flex-1">
+                        <div className="mb-2">
+                          <p className="text-xs text-gray-500">Full Name</p>
+                          <p className="font-semibold">{formData.fullName}</p>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-xs text-gray-500">Matric Number</p>
+                          <p className="font-semibold">
+                            {formData.matricNumber}
+                          </p>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-xs text-gray-500">
+                            Faculty/Department
+                          </p>
+                          <p className="font-semibold">
+                            {faculties.find((f) => f.id === formData.faculty)
+                              ?.name || ""}{" "}
+                            - {formData.department}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Level</p>
+                          <p className="font-semibold">{formData.level}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col items-center">
+                      <p className="text-xs text-gray-500 mb-2">
+                        Scan QR code for verification
+                      </p>
+                      <div className="bg-white p-2 rounded border border-gray-200">
+                        <QRCodeCanvas
+                          value={studentId}
+                          size={120}
+                          level="H"
+                          includeMargin={true}
+                          bgColor="#FFFFFF"
+                          fgColor="#000000"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 text-center">
+                      <p className="text-xs text-gray-500">
+                        This card is property of University Name
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Valid until: {new Date().getFullYear() + 1}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-2">
                 <Button
-                  onClick={downloadQRCode}
+                  onClick={downloadIDCard}
                   className="w-full bg-[#66DE16] hover:bg-[#66DE16]/90 text-[#1B1F3B]"
                 >
-                  Download QR Code
+                  <Download className="mr-2 h-4 w-4" />
+                  Download ID Card
                 </Button>
                 <Button
                   variant="outline"
