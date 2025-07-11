@@ -1,7 +1,6 @@
 "use client";
 
 import type React from "react";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -87,6 +86,9 @@ const faculties = [
   },
 ];
 
+// Available levels
+const levels = ["100", "200", "300", "400", "500"];
+
 export default function StudentPage() {
   const router = useRouter();
 
@@ -99,6 +101,7 @@ export default function StudentPage() {
     matricNumber: "",
     faculty: "",
     department: "",
+    level: "", // Added level field
     photo: null as File | null,
     photoPreview: "",
   });
@@ -152,6 +155,7 @@ export default function StudentPage() {
         !formData.matricNumber ||
         !formData.faculty ||
         !formData.department ||
+        !formData.level ||
         !formData.photo
       ) {
         toast.error("Missing Information", {
@@ -189,12 +193,12 @@ export default function StudentPage() {
         matricNumber: formData.matricNumber,
         faculty: facultyName,
         department: formData.department,
+        level: formData.level, // Save level to Firebase
         photoUrl: cloudinaryResult.secure_url,
         status: "Pending",
         createdAt: serverTimestamp(),
       });
 
-      // Update the QR code generation to ensure it's scannable
       setStudentId(docRef.id);
       setStep(2);
 
@@ -329,6 +333,27 @@ export default function StudentPage() {
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="level">Level</Label>
+                    <Select
+                      value={formData.level}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, level: value })
+                      }
+                    >
+                      <SelectTrigger id="level">
+                        <SelectValue placeholder="Select Level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {levels.map((level) => (
+                          <SelectItem key={level} value={level}>
+                            {level}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="photo">Passport Photo</Label>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 items-center">
                       <div className="flex items-center justify-center">
@@ -398,7 +423,6 @@ export default function StudentPage() {
                     size={200}
                     level="H"
                     includeMargin={true}
-                    renderAs="canvas"
                     bgColor="#FFFFFF"
                     fgColor="#000000"
                   />
@@ -412,7 +436,7 @@ export default function StudentPage() {
                   </p>
                   <p className="text-sm text-gray-500">
                     {faculties.find((f) => f.id === formData.faculty)?.name} -{" "}
-                    {formData.department}
+                    {formData.department} - Level {formData.level}
                   </p>
                 </div>
               </CardContent>
