@@ -25,9 +25,9 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
-import { initializeApp } from "firebase/app";
+import { db } from "@/lib/firebase";
+
 import {
-  getFirestore,
   collection,
   getDocs,
   query,
@@ -48,20 +48,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ManualEntry } from "@/components/manual-entry";
 import { toast } from "sonner";
-
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
 type Student = {
   id: string;
@@ -155,18 +141,26 @@ export default function AdminDashboardPage() {
   }, [searchQuery, statusFilter, students]);
 
   // Handle QR code scan
-  const handleScan = async (studentId: string) => {
-    if (!studentId || studentId.trim() === "") {
-      toast.error("Invalid QR Code", {
-        description: "QR code appears to be empty",
+  const handleScan = async (studentId: string | null) => {
+    console.log(
+      "AdminDashboardPage - Scanned input:",
+      studentId,
+      typeof studentId
+    ); // Debug log
+    if (
+      !studentId ||
+      typeof studentId !== "string" ||
+      studentId.trim() === ""
+    ) {
+      toast.error("Invalid QR Code or Input", {
+        description: "The input is empty or invalid.",
       });
+      setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      console.log("Scanned QR code:", studentId);
-
       let processedId = studentId.trim();
 
       // Try different ways to extract the student ID
@@ -178,10 +172,16 @@ export default function AdminDashboardPage() {
       else if (processedId.startsWith("{") || processedId.startsWith("[")) {
         try {
           const parsedData = JSON.parse(processedId);
-          if (parsedData && parsedData.id) {
-            processedId = parsedData.id;
-          } else if (parsedData && parsedData.studentId) {
-            processedId = parsedData.studentId;
+          if (parsedData && typeof parsedData === "object") {
+            if (parsedData.id) {
+              processedId = parsedData.id.toString();
+            } else if (parsedData.studentId) {
+              processedId = parsedData.studentId.toString();
+            } else {
+              throw new Error("No valid ID found in JSON");
+            }
+          } else {
+            throw new Error("Invalid JSON structure");
           }
         } catch (e) {
           console.log("Not valid JSON:", e);
@@ -202,7 +202,7 @@ export default function AdminDashboardPage() {
         }
       }
 
-      console.log("Processing student ID:", processedId);
+      console.log("AdminDashboardPage - Processed student ID:", processedId);
 
       // Validate the processed ID
       if (!/^[a-zA-Z0-9]{20}$/.test(processedId)) {

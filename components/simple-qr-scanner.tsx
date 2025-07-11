@@ -54,20 +54,28 @@ export function SimpleQrScanner({
   };
 
   // Handle scan result
-  const handleScan = (result: string) => {
-    if (result) {
+  const handleScan = (result: string | null) => {
+    console.log("SimpleQrScanner - Scan result:", result, typeof result); // Debug log
+    if (result && typeof result === "string") {
       setScanStatus("QR Code detected!");
       onScan(result);
       stopScanner();
       toast.success("QR Code Scanned!", {
         description: `Detected: ${result.substring(0, 30)}...`,
       });
+    } else {
+      console.warn("SimpleQrScanner - Invalid scan result:", result);
+      setError("Invalid QR code data detected");
+      setScanStatus("Invalid QR code data");
+      toast.error("Scan Error", {
+        description: "The scanned QR code contains invalid data.",
+      });
     }
   };
 
   // Handle scan errors
   const handleError = (err: Error) => {
-    console.error("Scanner error:", err);
+    console.error("SimpleQrScanner - Scanner error:", err);
     let errorMessage = "QR scanning failed.";
 
     if (err.name === "NotAllowedError") {
