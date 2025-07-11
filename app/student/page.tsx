@@ -101,7 +101,7 @@ export default function StudentPage() {
     matricNumber: "",
     faculty: "",
     department: "",
-    level: "", // Added level field
+    level: "",
     photo: null as File | null,
     photoPreview: "",
   });
@@ -165,10 +165,25 @@ export default function StudentPage() {
         return;
       }
 
+      // Validate image type
+      if (!["image/jpeg", "image/png"].includes(formData.photo.type)) {
+        toast.error("Invalid Image", {
+          description: "Please upload a valid JPEG or PNG image",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Log Cloudinary config
+      console.log(
+        "Cloudinary Cloud Name:",
+        process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+      );
+
       // Upload image to Cloudinary
       const cloudinaryData = new FormData();
       cloudinaryData.append("file", formData.photo);
-      cloudinaryData.append("upload_preset", "university_qr");
+      cloudinaryData.append("upload_preset", "StudentQr");
 
       const cloudinaryResponse = await fetch(
         `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
@@ -179,9 +194,17 @@ export default function StudentPage() {
       );
 
       const cloudinaryResult = await cloudinaryResponse.json();
+      console.log("Cloudinary Response Status:", cloudinaryResponse.status);
+      console.log("Cloudinary Result:", cloudinaryResult);
+
+      if (!cloudinaryResponse.ok) {
+        throw new Error(
+          cloudinaryResult.error?.message || "Failed to upload image"
+        );
+      }
 
       if (!cloudinaryResult.secure_url) {
-        throw new Error("Failed to upload image");
+        throw new Error("Image upload failed: No secure URL returned");
       }
 
       // Save to Firebase
@@ -193,7 +216,7 @@ export default function StudentPage() {
         matricNumber: formData.matricNumber,
         faculty: facultyName,
         department: formData.department,
-        level: formData.level, // Save level to Firebase
+        level: formData.level,
         photoUrl: cloudinaryResult.secure_url,
         status: "Pending",
         createdAt: serverTimestamp(),
@@ -205,10 +228,11 @@ export default function StudentPage() {
       toast.success("Success!", {
         description: "Your QR code has been generated successfully",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
       toast.error("Error", {
         description:
+          error.message ||
           "There was an error processing your request. Please try again.",
       });
     } finally {
