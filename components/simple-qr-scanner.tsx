@@ -144,8 +144,22 @@ export function SimpleQrScanner({
           ) : isScanning ? (
             <div className="relative w-full h-full">
               <Scanner
-                onScan={handleScan}
-                onError={handleError}
+                onScan={(detectedCodes) => {
+                  if (
+                    detectedCodes &&
+                    detectedCodes.length > 0 &&
+                    detectedCodes[0].rawValue
+                  ) {
+                    handleScan(detectedCodes[0].rawValue);
+                  }
+                }}
+                onError={(error: unknown) => {
+                  if (error instanceof Error) {
+                    handleError(error);
+                  } else {
+                    handleError(new Error(String(error)));
+                  }
+                }}
                 constraints={{ facingMode: "environment" }}
                 scanDelay={scanDelay}
                 styles={{
